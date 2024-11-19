@@ -4,39 +4,85 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"strconv"
 )
 
 func main() {
-	// var userInput string
 
-	// fmt.Scan(&userInput)
+	//demande du fichier à l'utilisateur
+	var userInput string
+	fmt.Println("Quel est le fichier que vous souhaitez traiter : ")
+	fmt.Scan(&userInput)
 
-	// if utils.JsonChecking(userInput) != nil {
-	// 	return
-	// }
-
-	// Open our jsonFile
-	jsonFile, err := os.Open("D:/Mes_documents/Programmation/json_splitter/test.json")
-	// if we os.Open returns an error then handle it
+	// Lire le fichier json à découper
+	sourceFile, err := os.Open(userInput)
 	if err != nil {
-		fmt.Println(err)
-	}
-	fmt.Println("Successfully Opened users.json")
-	// defer the closing of our jsonFile so that we can parse it later on
-	defer jsonFile.Close()
-
-	r := bufio.NewReader(jsonFile)
-
-	// fmt.Println(r)
-
-	data := make([]byte, 1000)
-
-	_, err = r.Read(data)
-
-	if err != nil {
-		fmt.Println(err)
+		fmt.Println("Erreur lors de l'ouverture du fichier :", err)
 		return
 	}
+	defer sourceFile.Close()
 
-	fmt.Println(string(data))
+	scanner := bufio.NewScanner(sourceFile)
+
+	const linePerFile = 500 // Nb max de lignes par fichier
+	nbLines := 0            // Compteur de ligne
+	nbFiles := 1            // numéro du fichier en cours de traitement
+
+	// Créer le premier fichier de destination
+	destFile, err := os.Create("fichier_" + strconv.Itoa(nbFiles) + ".json")
+	if err != nil {
+		fmt.Println("Erreur lors de la création du fichier :", err)
+		return
+	}
+	defer destFile.Close()
+
+	writer := bufio.NewWriter(destFile)
+
+	// Parcourir fichier source
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		nbLines++
+
+		// écriture de la ligne
+
+		_, err := writer.WriteString(line + "\n")
+		if err != nil {
+			fmt.Println("Erreur lors de l'écriture :", err)
+			return
+		}
+
+		if nbLines >= linePerFile {
+			err = writer.Flush()
+			if err != nil {
+				fmt.Println("Erreur lors de la finalisation de l'écriture :", err)
+				return
+			}
+			destFile.Close()
+
+			nbLines = 0
+			nbFiles++
+
+			// Créer un nouveau fichier
+			destFile, err = os.Create("fichier_" + strconv.Itoa(nbFiles) + ".json")
+			if err != nil {
+				fmt.Println("Erreur lors de la création du fichier :", err)
+				return
+			}
+			writer = bufio.NewWriter(destFile)
+		}
+	}
+	// Finaliser le dernier fichier
+	err = writer.Flush()
+	if err != nil {
+		fmt.Println("Erreur lors de la finalisation de l'écriture :", err)
+	}
+	destFile.Close()
+
+	// Vérifier les erreurs éventuelles de Scan
+	if err := scanner.Err(); err != nil {
+		fmt.Println("Erreur lors de la lecture :", err)
+	}
+
+	fmt.Println("Traitement terminé, les fichiers ont été créés.")
 }
